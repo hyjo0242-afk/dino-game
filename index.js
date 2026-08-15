@@ -2750,3 +2750,96 @@ function onDocumentLoad() {
 }
 
 document.addEventListener('DOMContentLoaded', onDocumentLoad);
+// ============================================
+// ===== АВТОПРЫЖОК (ДОБАВЛЕНО) =====
+// ============================================
+
+let autoJumpEnabled = true;
+let autoJumpDelay = 0;
+let errorMessage = '';
+
+// Переопределяем обработчик клавиш для добавления Z
+const originalOnKeyDown = Runner.prototype.onKeyDown;
+Runner.prototype.onKeyDown = function(e) {
+    // Кнопка Z — вкл/выкл автопрыжка
+    if (e.key === 'z' || e.key === 'Z') {
+        e.preventDefault();
+        autoJumpEnabled = !autoJumpEnabled;
+        console.log('🦕 Автопрыжок:', autoJumpEnabled ? '✅ ВКЛ' : '❌ ВЫКЛ');
+        if (autoJumpEnabled) {
+            errorMessage = 'Автопрыжок ВКЛЮЧЕН';
+        } else {
+            errorMessage = 'Автопрыжок ВЫКЛЮЧЕН';
+        }
+        return;
+    }
+    
+    // Вызываем оригинальный обработчик
+    originalOnKeyDown.call(this, e);
+};
+
+// Сохраняем оригинальный update
+const originalUpdate = Runner.prototype.update;
+
+// Переопределяем update для добавления автопрыжка
+Runner.prototype.update = function() {
+    // Вызываем оригинальный update
+    originalUpdate.call(this);
+    
+    // Если игра не активна — выходим
+    if (!this.playing || this.crashed || this.paused) return;
+    if (!autoJumpEnabled) return;
+    
+    // Получаем текущие препятствия
+    const obstacles = this.horizon.obstacles;
+    if (!obstacles || obstacles.length === 0) return;
+    
+    // Ближайшее препятствие
+    const nearestObstacle = obstacles[0];
+    if (!nearestObstacle) return;
+    
+    // Расстояние до препятствия
+    const dist = nearestObstacle.xPos - this.tRex.xPos;
+    
+    // Если препятствие близко и t-rex на земле
+    if (dist < 130 && dist > 10 && !this.tRex.jumping && !this.tRex.ducking) {
+        
+        // Случайная задержка перед прыжком (8-15 кадров)
+        if (autoJumpDelay < 8 + Math.random() * 7) {
+            autoJumpDelay++;
+            return;
+        }
+        autoJumpDelay = 0;
+        
+        // 12% шанс ошибки
+        const errorChance = Math.random();
+        if (errorChance < 0.12) {
+            // Ошибка: недопрыгнуть или опоздать
+            const errorType = Math.random();
+            if (errorType < 0.5) {
+                // Слабый прыжок (недопрыгнет)
+                this.tRex.startJump(this.currentSpeed * 0.3);
+                errorMessage = '😅 Недопрыгнул!';
+            } else {
+                // Опоздал с прыжком
+                setTimeout(() => {
+                    if (!this.crashed && this.playing && autoJumpEnabled) {
+                        this.tRex.startJump(this.currentSpeed);
+                        errorMessage = '😅 Опоздал!';
+                    }
+                }, 80 + Math.random() * 60);
+                errorMessage = '⏳ Задержка...';
+            }
+        } else {
+            // Нормальный прыжок
+            this.tRex.startJump(this.currentSpeed);
+            // errorMessage = '✅ Прыжок!';
+        }
+    } else {
+        // Сбрасываем таймер задержки
+        autoJumpDelay = 0;
+    }
+};
+
+console.log('🦕 Автопрыжок добавлен! Нажми Z для вкл/выкл');
+console.log('❌ 12% шанс ошибки (недопрыгнет/опоздает)');
